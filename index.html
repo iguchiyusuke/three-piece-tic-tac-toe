@@ -82,6 +82,11 @@
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 10px;
       margin-bottom: 14px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: var(--panel);
+      padding: 8px 0;
     }
     .timer-display {
       width: 100%;
@@ -218,11 +223,86 @@
       font-size: 13px;
     }
     @media (max-width: 520px) {
-      body { padding: 12px; }
-      .app { padding: 18px; }
-      .board { gap: 8px; }
-      .cell { border-radius: 14px; }
-      .timer-settings, .timers, .scoreboard { grid-template-columns: 1fr; }
+      body {
+        padding: 8px;
+        align-items: flex-start;
+      }
+      .app {
+        padding: 12px;
+        border-radius: 14px;
+      }
+      h1 {
+        font-size: 26px;
+        margin-bottom: 4px;
+      }
+      .subtitle {
+        font-size: 13px;
+        margin-bottom: 10px;
+      }
+      .timer-settings {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+      }
+      .timer-card {
+        padding: 8px;
+      }
+      .timer-card label {
+        font-size: 12px;
+        margin-bottom: 6px;
+      }
+      .timer-card input {
+        max-width: 100%;
+        padding: 7px;
+        font-size: 15px;
+      }
+      .timers {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        top: 0;
+        margin-left: -12px;
+        margin-right: -12px;
+        padding: 8px 12px;
+        border-bottom: 1px solid var(--line);
+      }
+      .timer-display {
+        font-size: 24px;
+        padding: 10px;
+        border-radius: 12px;
+      }
+      .status {
+        font-size: 14px;
+        padding: 10px;
+        margin-bottom: 12px;
+      }
+      .board {
+        gap: 8px;
+      }
+      .cell {
+        border-radius: 14px;
+      }
+      .controls {
+        gap: 8px;
+        margin-top: 14px;
+      }
+      button.control {
+        padding: 10px 13px;
+        font-size: 14px;
+      }
+      .handicap-panel,
+      .rules,
+      .footer {
+        font-size: 12px;
+      }
+      .scoreboard {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 6px;
+      }
+      .score {
+        padding: 8px 4px;
+        font-size: 12px;
+      }
+      .score span {
+        font-size: 18px;
+      }
     }
   </style>
 </head>
