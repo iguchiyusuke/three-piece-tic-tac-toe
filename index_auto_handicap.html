@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>三駒マルバツ</title>
+  <style>
+    :root {
+      --bg: #f6f4ef;
+      --panel: #ffffff;
+      --text: #222222;
+      --muted: #666666;
+      --line: #d8d2c4;
+      --accent: #2f6f5e;
+      --cell: #fffdf8;
+      --cell-hover: #eef6f2;
+      --selected: #f7df8a;
+      --danger: #b04747;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .app {
+      width: min(760px, 100%);
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      padding: 24px;
+      box-shadow: 0 18px 50px rgba(0,0,0,0.08);
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: clamp(28px, 5vw, 42px);
+      letter-spacing: 0.04em;
+      text-align: center;
+    }
+    .subtitle {
+      margin: 0 0 18px;
+      color: var(--muted);
+      text-align: center;
+      line-height: 1.6;
+    }
+    .timer-settings {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .timer-card {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 12px;
+      background: #faf8f3;
+      text-align: center;
+    }
+    .timer-card label {
+      display: block;
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+    .timer-card input {
+      width: 100%;
+      max-width: 140px;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      font-size: 16px;
+      text-align: center;
+    }
+    .timers {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .timer-display {
+      width: 100%;
+      margin: 0;
+      border: 2px solid var(--accent);
+      border-radius: 14px;
+      padding: 14px;
+      text-align: center;
+      background: #eef6f2;
+      font-size: 28px;
+      font-weight: 900;
+    }
+    .timer-display.active {
+      border-color: var(--accent);
+      background: #eef6f2;
+    }
+    .timer-display.low {
+      border-color: var(--danger);
+      color: var(--danger);
+      background: #fff5f5;
+    }
+    .status {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px 16px;
+      margin-bottom: 18px;
+      background: #faf8f3;
+      font-weight: 700;
+      text-align: center;
+      line-height: 1.6;
+    }
+    .board {
+      width: min(420px, 100%);
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+    .cell {
+      aspect-ratio: 1 / 1;
+      border: 2px solid var(--line);
+      border-radius: 18px;
+      background: var(--cell);
+      font-size: clamp(44px, 15vw, 82px);
+      font-weight: 800;
+      cursor: pointer;
+      transition: transform .08s ease, background .12s ease, border-color .12s ease;
+      color: var(--text);
+    }
+    .cell:hover {
+      background: var(--cell-hover);
+      transform: translateY(-1px);
+    }
+    .cell.selected {
+      background: var(--selected);
+      border-color: #c29b22;
+    }
+    .cell.win {
+      background: #dff3e8;
+      border-color: var(--accent);
+    }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+      margin-top: 20px;
+    }
+    button.control {
+      border: 0;
+      border-radius: 999px;
+      padding: 11px 18px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      background: var(--accent);
+      color: white;
+    }
+    button.control.secondary { background: #777; }
+    button.control.danger { background: var(--danger); }
+    .handicap-panel {
+      margin: 14px 0;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #faf8f3;
+      line-height: 1.7;
+      color: var(--muted);
+      font-size: 14px;
+      text-align: center;
+    }
+    .handicap-panel label {
+      font-weight: 800;
+      color: var(--text);
+    }
+    .handicap-panel input[type="checkbox"] {
+      transform: scale(1.2);
+      margin-right: 6px;
+    }
+    .scoreboard {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin: 14px 0;
+    }
+    .score {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px;
+      background: #fffdf8;
+      text-align: center;
+      font-weight: 800;
+    }
+    .score span {
+      display: block;
+      margin-top: 4px;
+      font-size: 22px;
+    }
+    .rules {
+      margin-top: 22px;
+      padding: 16px;
+      border-radius: 14px;
+      background: #faf8f3;
+      border: 1px solid var(--line);
+      line-height: 1.8;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .rules strong { color: var(--text); }
+    .footer {
+      margin-top: 16px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    @media (max-width: 520px) {
+      body { padding: 12px; }
+      .app { padding: 18px; }
+      .board { gap: 8px; }
+      .cell { border-radius: 14px; }
+      .timer-settings, .timers, .scoreboard { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <h1>三駒マルバツ</h1>
+    <p class="subtitle">○も×も3個だけ。置き終わったら、自分の印を空きマスへ移動して三目を狙います。</p>
+
+    <div class="timer-settings">
+      <div class="timer-card">
+        <label for="oTurnSeconds">○の1手あたり秒数</label>
+        <input id="oTurnSeconds" type="number" min="3" max="99" value="10">
+      </div>
+      <div class="timer-card">
+        <label for="xTurnSeconds">×の1手あたり秒数</label>
+        <input id="xTurnSeconds" type="number" min="3" max="99" value="10">
+      </div>
+    </div>
+
+    <div class="timers">
+      <div id="oTimer" class="timer-display">○ 10.0</div>
+      <div id="xTimer" class="timer-display">× 10.0</div>
+    </div>
+
+    <div class="handicap-panel">
+      <label><input id="autoHandicap" type="checkbox" checked>自動ハンデ調整を使う</label><br>
+      勝った側は次局 -1秒、負けた側は次局 +1秒。引き分けは調整なし。
+    </div>
+
+    <div class="scoreboard">
+      <div class="score">○勝利<span id="oWins">0</span></div>
+      <div class="score">×勝利<span id="xWins">0</span></div>
+      <div class="score">引き分け<span id="draws">0</span></div>
+    </div>
+
+    <div id="status" class="status"></div>
+
+    <section class="board" aria-label="三駒マルバツ盤面">
+      <button class="cell" data-index="0" aria-label="左上"></button>
+      <button class="cell" data-index="1" aria-label="上中央"></button>
+      <button class="cell" data-index="2" aria-label="右上"></button>
+      <button class="cell" data-index="3" aria-label="中央左"></button>
+      <button class="cell" data-index="4" aria-label="中央"></button>
+      <button class="cell" data-index="5" aria-label="中央右"></button>
+      <button class="cell" data-index="6" aria-label="左下"></button>
+      <button class="cell" data-index="7" aria-label="下中央"></button>
+      <button class="cell" data-index="8" aria-label="右下"></button>
+    </section>
+
+    <div class="controls">
+      <button class="control" id="startButton">スタート</button>
+      <button class="control secondary" id="resetButton">リセット</button>
+      <button class="control secondary" id="undoButton">1手戻す</button>
+      <button class="control danger" id="pauseButton">一時停止</button>
+    </div>
+
+    <div class="rules">
+      <strong>ルール</strong><br>
+      ・○が先手、×が後手。<br>
+      ・各プレイヤーは3個まで配置できます。<br>
+      ・3個配置後は、自分の印を1個選び、空いている好きなマスへ移動します。<br>
+      ・縦・横・斜めに3つ並んだ瞬間に勝利です。<br>
+      ・同一局面と手番が3回出たら引き分けです。<br>
+      ・1手あたりの制限時間は初期設定10秒です。○と×で秒数を変えるとハンデ戦になります。時間切れになると負けです。<br>
+      ・自動ハンデ調整ONの場合、勝った側は次局-1秒、負けた側は次局+1秒になります。下限3秒、上限99秒です。
+    </div>
+
+    <div class="footer">GitHub Pages対応：この index.html だけで動作します。</div>
+  </main>
+
+  <script>
+    const cells = [...document.querySelectorAll(".cell")];
+    const statusEl = document.getElementById("status");
+    const startButton = document.getElementById("startButton");
+    const resetButton = document.getElementById("resetButton");
+    const undoButton = document.getElementById("undoButton");
+    const pauseButton = document.getElementById("pauseButton");
+    const oTurnSecondsInput = document.getElementById("oTurnSeconds");
+    const xTurnSecondsInput = document.getElementById("xTurnSeconds");
+    const oTimerEl = document.getElementById("oTimer");
+    const xTimerEl = document.getElementById("xTimer");
+    const autoHandicapInput = document.getElementById("autoHandicap");
+    const oWinsEl = document.getElementById("oWins");
+    const xWinsEl = document.getElementById("xWins");
+    const drawsEl = document.getElementById("draws");
+
+    const WIN_LINES = [
+      [0, 1, 2], [3, 4, 5], [6, 7, 8],
+      [0, 3, 6], [1, 4, 7], [2, 5, 8],
+      [0, 4, 8], [2, 4, 6]
+    ];
+
+    let board, currentPlayer, selectedIndex, gameOver, history, positionCounts;
+    let turnLimits, turnTimeLeft, timerId, lastTick, paused, started;
+    let scores = { "○": 0, "×": 0, draw: 0 };
+    let resultRecorded = false;
+
+    function clampSeconds(value) {
+      return Math.max(3, Math.min(99, Math.round(value)));
+    }
+
+    function applyAutoHandicap(winner, reason) {
+      if (resultRecorded) return;
+      resultRecorded = true;
+
+      if (winner === "○" || winner === "×") {
+        scores[winner] += 1;
+      } else {
+        scores.draw += 1;
+      }
+
+      if (autoHandicapInput.checked && (winner === "○" || winner === "×")) {
+        const loser = winner === "○" ? "×" : "○";
+        const winnerInput = winner === "○" ? oTurnSecondsInput : xTurnSecondsInput;
+        const loserInput = loser === "○" ? oTurnSecondsInput : xTurnSecondsInput;
+
+        winnerInput.value = clampSeconds(Number(winnerInput.value) - 1);
+        loserInput.value = clampSeconds(Number(loserInput.value) + 1);
+      }
+
+      renderScores();
+    }
+
+    function renderScores() {
+      oWinsEl.textContent = scores["○"];
+      xWinsEl.textContent = scores["×"];
+      drawsEl.textContent = scores.draw;
+    }
+
+    function initGame() {
+      board = Array(9).fill("");
+      currentPlayer = "○";
+      selectedIndex = null;
+      gameOver = false;
+      history = [];
+      positionCounts = new Map();
+      paused = true;
+      started = false;
+      resultRecorded = false;
+
+      turnLimits = {
+        "○": Math.max(3, Math.min(99, Number(oTurnSecondsInput.value) || 10)),
+        "×": Math.max(3, Math.min(99, Number(xTurnSecondsInput.value) || 10))
+      };
+      oTurnSecondsInput.value = turnLimits["○"];
+      xTurnSecondsInput.value = turnLimits["×"];
+      turnTimeLeft = {
+        "○": turnLimits["○"],
+        "×": turnLimits["×"]
+      };
+
+      recordPosition();
+      clearInterval(timerId);
+      pauseButton.textContent = "一時停止";
+      renderScores();
+      render();
+    }
+
+    function startGame() {
+      if (gameOver) return;
+      if (!started) {
+        started = true;
+        paused = false;
+        startTimer();
+        render();
+        return;
+      }
+      if (paused) {
+        togglePause();
+      }
+    }
+
+    function startTimer() {
+      clearInterval(timerId);
+      lastTick = performance.now();
+      timerId = setInterval(tick, 100);
+      pauseButton.textContent = "一時停止";
+    }
+
+    function tick() {
+      if (gameOver || paused || !started) return;
+
+      const now = performance.now();
+      const elapsed = (now - lastTick) / 1000;
+      lastTick = now;
+
+      turnTimeLeft[currentPlayer] -= elapsed;
+
+      if (turnTimeLeft[currentPlayer] <= 0) {
+        turnTimeLeft[currentPlayer] = 0;
+        gameOver = true;
+        clearInterval(timerId);
+        const loser = currentPlayer;
+        const winner = currentPlayer === "○" ? "×" : "○";
+        applyAutoHandicap(winner, "timeout");
+        render();
+        statusEl.textContent = loser + " の時間切れ。 " + winner + " の勝ち！ 次局は自動ハンデが反映されます。";
+        return;
+      }
+
+      renderTimer();
+    }
+
+    function resetTurnTimer() {
+      turnTimeLeft[currentPlayer] = turnLimits[currentPlayer];
+      lastTick = performance.now();
+    }
+
+    function togglePause() {
+      if (gameOver || !started) return;
+      paused = !paused;
+      lastTick = performance.now();
+      pauseButton.textContent = paused ? "再開" : "一時停止";
+      render();
+    }
+
+    function countMarks(player) {
+      return board.filter(v => v === player).length;
+    }
+
+    function isPlacementPhaseFor(player) {
+      return countMarks(player) < 3;
+    }
+
+    function getPositionKey() {
+      return board.map(v => v || "-").join("") + "|" + currentPlayer;
+    }
+
+    function recordPosition() {
+      const key = getPositionKey();
+      positionCounts.set(key, (positionCounts.get(key) || 0) + 1);
+    }
+
+    function rebuildPositionCounts() {
+      positionCounts = new Map();
+      const add = (b, p) => {
+        const key = b.map(v => v || "-").join("") + "|" + p;
+        positionCounts.set(key, (positionCounts.get(key) || 0) + 1);
+      };
+      add(Array(9).fill(""), "○");
+      for (const item of history) {
+        add(item.afterBoard, item.afterPlayer);
+      }
+    }
+
+    function checkWinner() {
+      for (const line of WIN_LINES) {
+        const [a, b, c] = line;
+        if (board[a] && board[a] === board[b] && board[a] === board[c]) {
+          return { player: board[a], line };
+        }
+      }
+      return null;
+    }
+
+    function saveHistory(beforeBoard, beforePlayer, beforeTurnTime, afterBoard, afterPlayer, afterTurnTime) {
+      history.push({
+        beforeBoard: beforeBoard.slice(),
+        beforePlayer,
+        beforeTurnTime: { ...beforeTurnTime },
+        afterBoard: afterBoard.slice(),
+        afterPlayer,
+        afterTurnTime: { ...afterTurnTime }
+      });
+    }
+
+    function handleCellClick(index) {
+      if (gameOver || paused || !started) return;
+
+      const beforeBoard = board.slice();
+      const beforePlayer = currentPlayer;
+      const beforeTurnTime = { ...turnTimeLeft };
+
+      if (isPlacementPhaseFor(currentPlayer)) {
+        if (board[index]) return;
+        board[index] = currentPlayer;
+        finishTurn(beforeBoard, beforePlayer, beforeTurnTime);
+        return;
+      }
+
+      if (selectedIndex === null) {
+        if (board[index] === currentPlayer) {
+          selectedIndex = index;
+          render();
+        }
+        return;
+      }
+
+      if (index === selectedIndex) {
+        selectedIndex = null;
+        render();
+        return;
+      }
+
+      if (board[index] === currentPlayer) {
+        selectedIndex = index;
+        render();
+        return;
+      }
+
+      if (!board[index]) {
+        board[index] = currentPlayer;
+        board[selectedIndex] = "";
+        selectedIndex = null;
+        finishTurn(beforeBoard, beforePlayer, beforeTurnTime);
+      }
+    }
+
+    function finishTurn(beforeBoard, beforePlayer, beforeTurnTime) {
+      const winner = checkWinner();
+
+      if (winner) {
+        gameOver = true;
+        clearInterval(timerId);
+        saveHistory(beforeBoard, beforePlayer, beforeTurnTime, board, currentPlayer, turnTimeLeft);
+        applyAutoHandicap(winner.player, "line");
+        render(winner);
+        return;
+      }
+
+      currentPlayer = currentPlayer === "○" ? "×" : "○";
+      resetTurnTimer();
+      saveHistory(beforeBoard, beforePlayer, beforeTurnTime, board, currentPlayer, turnTimeLeft);
+      recordPosition();
+
+      const key = getPositionKey();
+      if (positionCounts.get(key) >= 3) {
+        gameOver = true;
+        clearInterval(timerId);
+        applyAutoHandicap("draw", "repeat");
+        render(null, true);
+        return;
+      }
+
+      render();
+    }
+
+    function undo() {
+      if (history.length === 0 || resultRecorded) return;
+
+      const last = history.pop();
+      board = last.beforeBoard.slice();
+      currentPlayer = last.beforePlayer;
+      turnTimeLeft = { ...last.beforeTurnTime };
+      selectedIndex = null;
+      gameOver = false;
+      paused = false;
+      started = true;
+      rebuildPositionCounts();
+      startTimer();
+      render();
+    }
+
+    function formatTime(sec) {
+      return Math.max(0, sec).toFixed(1);
+    }
+
+    function renderTimer() {
+      oTimerEl.textContent = "○ " + formatTime(turnTimeLeft["○"]);
+      xTimerEl.textContent = "× " + formatTime(turnTimeLeft["×"]);
+
+      oTimerEl.classList.toggle("active", currentPlayer === "○" && started && !paused && !gameOver);
+      xTimerEl.classList.toggle("active", currentPlayer === "×" && started && !paused && !gameOver);
+
+      oTimerEl.classList.toggle("low", turnTimeLeft["○"] <= 3);
+      xTimerEl.classList.toggle("low", turnTimeLeft["×"] <= 3);
+    }
+
+    function render(winner = null, draw = false) {
+      renderTimer();
+
+      cells.forEach((cell, index) => {
+        cell.textContent = board[index];
+        cell.classList.toggle("selected", index === selectedIndex);
+        cell.classList.remove("win");
+      });
+
+      if (winner) {
+        winner.line.forEach(i => cells[i].classList.add("win"));
+        statusEl.textContent = winner.player + " の勝ち！ 次局は自動ハンデが反映されます。";
+        return;
+      }
+
+      if (draw) {
+        statusEl.textContent = "同一局面が3回出たため、引き分けです。";
+        return;
+      }
+
+      if (!started) {
+        statusEl.textContent = "○と×の秒数を設定して、スタートを押してください。";
+        return;
+      }
+
+      if (paused) {
+        statusEl.textContent = "一時停止中です。";
+        return;
+      }
+
+      const phase = isPlacementPhaseFor(currentPlayer) ? "配置" : "移動";
+      const placed = countMarks(currentPlayer);
+
+      if (phase === "配置") {
+        statusEl.textContent = currentPlayer + " の手番：空いているマスに配置してください。（" + placed + "/3）";
+      } else if (selectedIndex === null) {
+        statusEl.textContent = currentPlayer + " の手番：移動する自分の印を選んでください。";
+      } else {
+        statusEl.textContent = currentPlayer + " の手番：移動先の空きマスを選んでください。";
+      }
+    }
+
+    cells.forEach(cell => {
+      cell.addEventListener("click", () => handleCellClick(Number(cell.dataset.index)));
+    });
+
+    startButton.addEventListener("click", startGame);
+    resetButton.addEventListener("click", initGame);
+    undoButton.addEventListener("click", undo);
+    pauseButton.addEventListener("click", togglePause);
+
+    initGame();
+  </script>
+</body>
+</html>
