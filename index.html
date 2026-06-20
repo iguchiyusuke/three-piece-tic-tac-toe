@@ -28,6 +28,7 @@
       align-items: center;
       justify-content: center;
       padding: 24px;
+      overflow-x: hidden;
     }
     .app {
       width: min(760px, 100%);
@@ -130,7 +131,7 @@
       border: 2px solid var(--line);
       border-radius: 18px;
       background: var(--cell);
-      font-size: clamp(44px, 15vw, 82px);
+      font-size: clamp(32px, 10vw, 82px);
       font-weight: 800;
       cursor: pointer;
       transition: transform .08s ease, background .12s ease, border-color .12s ease;
@@ -158,7 +159,8 @@
     button.control {
       border: 0;
       border-radius: 999px;
-      padding: 11px 18px;
+      padding: 14px 22px;
+      min-height: 48px;
       font-size: 15px;
       font-weight: 700;
       cursor: pointer;
@@ -167,6 +169,7 @@
     }
     button.control.secondary { background: #777; }
     button.control.danger { background: var(--danger); }
+    button.control.auto-active { background: #b07a10; }
     .handicap-panel {
       margin: 14px 0;
       padding: 14px;
@@ -222,6 +225,32 @@
       color: var(--muted);
       font-size: 13px;
     }
+    @media (min-width: 521px) and (max-width: 900px) {
+      body {
+        padding: 16px;
+        align-items: flex-start;
+      }
+      .app {
+        padding: 20px;
+      }
+      .board {
+        width: min(380px, 100%);
+        gap: 10px;
+      }
+      .cell {
+        font-size: clamp(36px, 9vw, 72px);
+        border-radius: 16px;
+      }
+      .timer-display {
+        font-size: 24px;
+        padding: 12px;
+      }
+      button.control {
+        padding: 13px 18px;
+        font-size: 14px;
+      }
+    }
+
     @media (max-width: 520px) {
       body {
         padding: 8px;
@@ -355,7 +384,7 @@
     <div class="controls">
       <button class="control" id="startButton">スタート</button>
       <button class="control secondary" id="resetButton">リセット</button>
-      <button class="control secondary" id="undoButton">1手戻す</button>
+      <button class="control secondary" id="autoButton">自動対戦</button>
       <button class="control danger" id="pauseButton">一時停止</button>
     </div>
 
@@ -378,7 +407,7 @@
     const statusEl = document.getElementById("status");
     const startButton = document.getElementById("startButton");
     const resetButton = document.getElementById("resetButton");
-    const undoButton = document.getElementById("undoButton");
+    const autoButton = document.getElementById("autoButton");
     const pauseButton = document.getElementById("pauseButton");
     const oTurnSecondsInput = document.getElementById("oTurnSeconds");
     const xTurnSecondsInput = document.getElementById("xTurnSeconds");
@@ -395,16 +424,18 @@
       [0, 4, 8], [2, 4, 6]
     ];
 
-    let board, currentPlayer, selectedIndex, gameOver, history, positionCounts;
+    let board, currentPlayer, selectedIndex, gameOver, positionCounts;
     let turnLimits, turnTimeLeft, timerId, lastTick, paused, started;
     let scores = { "○": 0, "×": 0, draw: 0 };
     let resultRecorded = false;
+    let isAutoPlaying = false;
+    let autoTimerId = null;
 
     function clampSeconds(value) {
       return Math.max(3, Math.min(99, Math.round(value)));
     }
 
-    function applyAutoHandicap(winner, reason) {
+    function applyAutoHandicap(winner) {
       if (resultRecorded) return;
       resultRecorded = true;
 
@@ -432,16 +463,20 @@
       drawsEl.textContent = scores.draw;
     }
 
-    function initGame() {
+    function initGame(resetScores = false) {
       board = Array(9).fill("");
       currentPlayer = "○";
       selectedIndex = null;
       gameOver = false;
-      history = [];
       positionCounts = new Map();
       paused = true;
       started = false;
       resultRecorded = false;
+
+      if (resetScores) {
+        scores = { "○": 0, "×": 0, draw: 0 };
+        stopAutoPlay();
+      }
 
       turnLimits = {
         "○": Math.max(3, Math.min(99, Number(oTurnSecondsInput.value) || 10)),
@@ -497,9 +532,10 @@
         clearInterval(timerId);
         const loser = currentPlayer;
         const winner = currentPlayer === "○" ? "×" : "○";
-        applyAutoHandicap(winner, "timeout");
+        applyAutoHandicap(winner);
         render();
         statusEl.textContent = loser + " の時間切れ。 " + winner + " の勝ち！ 次局は自動ハンデが反映されます。";
+        if (isAutoPlaying) scheduleAutoNext();
         return;
       }
 
@@ -536,18 +572,6 @@
       positionCounts.set(key, (positionCounts.get(key) || 0) + 1);
     }
 
-    function rebuildPositionCounts() {
-      positionCounts = new Map();
-      const add = (b, p) => {
-        const key = b.map(v => v || "-").join("") + "|" + p;
-        positionCounts.set(key, (positionCounts.get(key) || 0) + 1);
-      };
-      add(Array(9).fill(""), "○");
-      for (const item of history) {
-        add(item.afterBoard, item.afterPlayer);
-      }
-    }
-
     function checkWinner() {
       for (const line of WIN_LINES) {
         const [a, b, c] = line;
@@ -558,28 +582,13 @@
       return null;
     }
 
-    function saveHistory(beforeBoard, beforePlayer, beforeTurnTime, afterBoard, afterPlayer, afterTurnTime) {
-      history.push({
-        beforeBoard: beforeBoard.slice(),
-        beforePlayer,
-        beforeTurnTime: { ...beforeTurnTime },
-        afterBoard: afterBoard.slice(),
-        afterPlayer,
-        afterTurnTime: { ...afterTurnTime }
-      });
-    }
-
     function handleCellClick(index) {
-      if (gameOver || paused || !started) return;
-
-      const beforeBoard = board.slice();
-      const beforePlayer = currentPlayer;
-      const beforeTurnTime = { ...turnTimeLeft };
+      if (gameOver || paused || !started || isAutoPlaying) return;
 
       if (isPlacementPhaseFor(currentPlayer)) {
         if (board[index]) return;
         board[index] = currentPlayer;
-        finishTurn(beforeBoard, beforePlayer, beforeTurnTime);
+        finishTurn();
         return;
       }
 
@@ -607,54 +616,160 @@
         board[index] = currentPlayer;
         board[selectedIndex] = "";
         selectedIndex = null;
-        finishTurn(beforeBoard, beforePlayer, beforeTurnTime);
+        finishTurn();
       }
     }
 
-    function finishTurn(beforeBoard, beforePlayer, beforeTurnTime) {
+    function finishTurn() {
       const winner = checkWinner();
 
       if (winner) {
         gameOver = true;
         clearInterval(timerId);
-        saveHistory(beforeBoard, beforePlayer, beforeTurnTime, board, currentPlayer, turnTimeLeft);
-        applyAutoHandicap(winner.player, "line");
+        applyAutoHandicap(winner.player);
         render(winner);
+        if (isAutoPlaying) scheduleAutoNext();
         return;
       }
 
       currentPlayer = currentPlayer === "○" ? "×" : "○";
       resetTurnTimer();
-      saveHistory(beforeBoard, beforePlayer, beforeTurnTime, board, currentPlayer, turnTimeLeft);
       recordPosition();
 
       const key = getPositionKey();
       if (positionCounts.get(key) >= 3) {
         gameOver = true;
         clearInterval(timerId);
-        applyAutoHandicap("draw", "repeat");
+        applyAutoHandicap("draw");
         render(null, true);
+        if (isAutoPlaying) scheduleAutoNext();
         return;
       }
 
       render();
+      if (isAutoPlaying) scheduleAutoMove();
     }
 
-    function undo() {
-      if (history.length === 0 || resultRecorded) return;
+    // --- AI logic ---
 
-      const last = history.pop();
-      board = last.beforeBoard.slice();
-      currentPlayer = last.beforePlayer;
-      turnTimeLeft = { ...last.beforeTurnTime };
-      selectedIndex = null;
-      gameOver = false;
-      paused = false;
-      started = true;
-      rebuildPositionCounts();
-      startTimer();
-      render();
+    function aiPickMove() {
+      const player = currentPlayer;
+      const opponent = player === "○" ? "×" : "○";
+
+      if (isPlacementPhaseFor(player)) {
+        // placement phase: try to win, then block, then random
+        const empties = board.map((v, i) => v === "" ? i : -1).filter(i => i >= 0);
+        const win = empties.find(i => wouldWin(board, player, i));
+        if (win !== undefined) return { type: "place", to: win };
+        const block = empties.find(i => wouldWin(board, opponent, i));
+        if (block !== undefined) return { type: "place", to: block };
+        return { type: "place", to: empties[Math.floor(Math.random() * empties.length)] };
+      }
+
+      // move phase: try each own piece × each empty cell
+      const ownPieces = board.map((v, i) => v === player ? i : -1).filter(i => i >= 0);
+      const empties = board.map((v, i) => v === "" ? i : -1).filter(i => i >= 0);
+
+      for (const from of ownPieces) {
+        for (const to of empties) {
+          const tmp = board.slice();
+          tmp[from] = "";
+          tmp[to] = player;
+          if (checkWinnerOn(tmp, player)) return { type: "move", from, to };
+        }
+      }
+      for (const oppFrom of board.map((v, i) => v === opponent ? i : -1).filter(i => i >= 0)) {
+        for (const to of empties) {
+          const tmp = board.slice();
+          tmp[oppFrom] = "";
+          tmp[to] = opponent;
+          if (checkWinnerOn(tmp, opponent)) {
+            const from = ownPieces[Math.floor(Math.random() * ownPieces.length)];
+            const safeEmpties = empties.filter(e => e !== to);
+            const dest = safeEmpties.length ? safeEmpties[Math.floor(Math.random() * safeEmpties.length)] : to;
+            return { type: "move", from, to: dest };
+          }
+        }
+      }
+
+      const from = ownPieces[Math.floor(Math.random() * ownPieces.length)];
+      const to = empties[Math.floor(Math.random() * empties.length)];
+      return { type: "move", from, to };
     }
+
+    function wouldWin(b, player, index) {
+      const tmp = b.slice();
+      tmp[index] = player;
+      return checkWinnerOn(tmp, player);
+    }
+
+    function checkWinnerOn(b, player) {
+      return WIN_LINES.some(([a, c, d]) => b[a] === player && b[c] === player && b[d] === player);
+    }
+
+    function scheduleAutoMove() {
+      clearTimeout(autoTimerId);
+      autoTimerId = setTimeout(executeAutoMove, 500);
+    }
+
+    function scheduleAutoNext() {
+      clearTimeout(autoTimerId);
+      autoTimerId = setTimeout(() => {
+        initGame(false);
+        startGame();
+        scheduleAutoMove();
+      }, 1200);
+    }
+
+    function executeAutoMove() {
+      if (!isAutoPlaying || gameOver) return;
+      const move = aiPickMove();
+      if (!move) return;
+
+      if (move.type === "place") {
+        board[move.to] = currentPlayer;
+        finishTurn();
+      } else {
+        board[move.from] = "";
+        board[move.to] = currentPlayer;
+        selectedIndex = null;
+        finishTurn();
+      }
+    }
+
+    function startAutoPlay() {
+      isAutoPlaying = true;
+      autoButton.textContent = "自動対戦停止";
+      autoButton.classList.add("auto-active");
+      autoButton.classList.remove("secondary");
+      if (gameOver) {
+        initGame(false);
+      }
+      if (!started) {
+        startGame();
+      } else if (paused) {
+        togglePause();
+      }
+      scheduleAutoMove();
+    }
+
+    function stopAutoPlay() {
+      isAutoPlaying = false;
+      clearTimeout(autoTimerId);
+      autoButton.textContent = "自動対戦";
+      autoButton.classList.remove("auto-active");
+      autoButton.classList.add("secondary");
+    }
+
+    function toggleAutoPlay() {
+      if (isAutoPlaying) {
+        stopAutoPlay();
+      } else {
+        startAutoPlay();
+      }
+    }
+
+    // --- rendering ---
 
     function formatTime(sec) {
       return Math.max(0, sec).toFixed(1);
@@ -718,11 +833,11 @@
     });
 
     startButton.addEventListener("click", startGame);
-    resetButton.addEventListener("click", initGame);
-    undoButton.addEventListener("click", undo);
+    resetButton.addEventListener("click", () => initGame(true));
+    autoButton.addEventListener("click", toggleAutoPlay);
     pauseButton.addEventListener("click", togglePause);
 
-    initGame();
+    initGame(false);
   </script>
 </body>
 </html>
