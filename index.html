@@ -476,6 +476,8 @@
       if (resetScores) {
         scores = { "○": 0, "×": 0, draw: 0 };
         stopAutoPlay();
+        oTurnSecondsInput.value = 10;
+        xTurnSecondsInput.value = 10;
       }
 
       turnLimits = {
@@ -583,7 +585,8 @@
     }
 
     function handleCellClick(index) {
-      if (gameOver || paused || !started || isAutoPlaying) return;
+      if (gameOver || paused || !started) return;
+      if (isAutoPlaying && currentPlayer === "×") return;
 
       if (isPlacementPhaseFor(currentPlayer)) {
         if (board[index]) return;
@@ -647,47 +650,54 @@
       }
 
       render();
-      if (isAutoPlaying) scheduleAutoMove();
+      if (isAutoPlaying && currentPlayer === "×") scheduleAutoMove();
     }
 
     // --- AI logic ---
+    // AI_RANDOM_RATE: 勝ち手・ブロック手をスキップしてランダムに打つ確率（0〜1）
+    // 0=最強、1=完全ランダム。0.4で人間と概ね五分になるよう調整
+    const AI_RANDOM_RATE = 0.1;
 
     function aiPickMove() {
       const player = currentPlayer;
       const opponent = player === "○" ? "×" : "○";
+      const rand = Math.random();
 
       if (isPlacementPhaseFor(player)) {
-        // placement phase: try to win, then block, then random
         const empties = board.map((v, i) => v === "" ? i : -1).filter(i => i >= 0);
-        const win = empties.find(i => wouldWin(board, player, i));
-        if (win !== undefined) return { type: "place", to: win };
-        const block = empties.find(i => wouldWin(board, opponent, i));
-        if (block !== undefined) return { type: "place", to: block };
+        if (rand >= AI_RANDOM_RATE) {
+          const win = empties.find(i => wouldWin(board, player, i));
+          if (win !== undefined) return { type: "place", to: win };
+          const block = empties.find(i => wouldWin(board, opponent, i));
+          if (block !== undefined) return { type: "place", to: block };
+        }
         return { type: "place", to: empties[Math.floor(Math.random() * empties.length)] };
       }
 
-      // move phase: try each own piece × each empty cell
+      // move phase
       const ownPieces = board.map((v, i) => v === player ? i : -1).filter(i => i >= 0);
       const empties = board.map((v, i) => v === "" ? i : -1).filter(i => i >= 0);
 
-      for (const from of ownPieces) {
-        for (const to of empties) {
-          const tmp = board.slice();
-          tmp[from] = "";
-          tmp[to] = player;
-          if (checkWinnerOn(tmp, player)) return { type: "move", from, to };
+      if (rand >= AI_RANDOM_RATE) {
+        for (const from of ownPieces) {
+          for (const to of empties) {
+            const tmp = board.slice();
+            tmp[from] = "";
+            tmp[to] = player;
+            if (checkWinnerOn(tmp, player)) return { type: "move", from, to };
+          }
         }
-      }
-      for (const oppFrom of board.map((v, i) => v === opponent ? i : -1).filter(i => i >= 0)) {
-        for (const to of empties) {
-          const tmp = board.slice();
-          tmp[oppFrom] = "";
-          tmp[to] = opponent;
-          if (checkWinnerOn(tmp, opponent)) {
-            const from = ownPieces[Math.floor(Math.random() * ownPieces.length)];
-            const safeEmpties = empties.filter(e => e !== to);
-            const dest = safeEmpties.length ? safeEmpties[Math.floor(Math.random() * safeEmpties.length)] : to;
-            return { type: "move", from, to: dest };
+        for (const oppFrom of board.map((v, i) => v === opponent ? i : -1).filter(i => i >= 0)) {
+          for (const to of empties) {
+            const tmp = board.slice();
+            tmp[oppFrom] = "";
+            tmp[to] = opponent;
+            if (checkWinnerOn(tmp, opponent)) {
+              const from = ownPieces[Math.floor(Math.random() * ownPieces.length)];
+              const safeEmpties = empties.filter(e => e !== to);
+              const dest = safeEmpties.length ? safeEmpties[Math.floor(Math.random() * safeEmpties.length)] : to;
+              return { type: "move", from, to: dest };
+            }
           }
         }
       }
@@ -717,7 +727,6 @@
       autoTimerId = setTimeout(() => {
         initGame(false);
         startGame();
-        scheduleAutoMove();
       }, 1200);
     }
 
@@ -750,7 +759,7 @@
       } else if (paused) {
         togglePause();
       }
-      scheduleAutoMove();
+      if (currentPlayer === "×") scheduleAutoMove();
     }
 
     function stopAutoPlay() {
