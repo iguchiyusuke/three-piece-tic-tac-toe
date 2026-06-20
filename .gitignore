@@ -1,0 +1,43 @@
+# Claude Code設定
+.claude/
+CLAUDE.md
+
+# サイト運用フォルダ
+fumeitochi.com/
+iguchi-koumusyo.com/
+efudosanya.com/
+e-village/
+backup/
+work_cash/
+
+# Matomoスクリプト・データ
+fetch_matomo.py
+fetch_matomo_90d.py
+matomo_pages_last30.json
+README_matomo.md
+
+# 素材・作業用フォルダ
+素材/
+妖怪/
+code/
+box-photo-map/
+
+# 環境変数・秘密情報
+.env
+.env.local
+.env.example
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+
+# 依存パッケージ
+requirements.txt
+node_modules/
+
+# OS
+.DS_Store
+Thumbs.db
